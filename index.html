@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rock Paper Scissors Inmersive Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    video { object-fit: cover; }
+    .neon { text-shadow: 0 0 20px rgb(34 211 238), 0 0 40px rgb(34 211 238); }
+    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); }
+  </style>
+</head>
+<body class="bg-black text-white h-screen overflow-hidden relative">
+
+  <!-- Cámara full-screen -->
+  <video id="webcam" autoplay playsinline muted class="absolute inset-0 w-full h-full z-[-1]"></video>
+
+  <!-- Overlay -->
+  <div id="overlay" class="absolute inset-0 flex items-center justify-center z-10">
+    <div class="text-center px-8 max-w-md w-full glass rounded-3xl py-12 border border-white/20">
+
+      <div id="mainMessage" class="text-3xl font-semibold mb-8 transition-all">
+        Haz <span class="text-cyan-400">pulgar arriba 👍</span><br>para comenzar
+      </div>
+
+      <div id="countdownContainer" class="hidden">
+        <div id="countdown" class="text-[12rem] font-bold text-cyan-400 tracking-tighter neon transition-all duration-200"></div>
+      </div>
+
+      <div id="resultContainer" class="hidden space-y-8">
+        <div class="flex justify-center gap-16 text-8xl" id="choices"></div>
+        <div id="resultText" class="text-5xl font-bold"></div>
+        <div class="text-sm opacity-75">Pulgar arriba para jugar de nuevo</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+    const video = document.getElementById('webcam');
+    const mainMessage = document.getElementById('mainMessage');
+    const countdownContainer = document.getElementById('countdownContainer');
+    const countdownEl = document.getElementById('countdown');
+    const resultContainer = document.getElementById('resultContainer');
+    const choicesEl = document.getElementById('choices');
+    const resultTextEl = document.getElementById('resultText');
+
+    let gestureRecognizer = null;
+    let lastGesture = null;
+    let lastScore = 0;
+    let state = 'idle';
+    let countdownInterval = null;
+
+    const gesturesMap = {
+      'Closed_Fist': { name: 'rock', emoji: '✊' },
+      'Open_Palm':   { name: 'paper', emoji: '✋' },
+      'Victory':     { name: 'scissors', emoji: '✌️' },
+      'Thumb_Up':    { name: 'thumbsup', emoji: '👍' }
+    };
+
+    function getResult(user, computer) {
+      if (user === computer) return { text: '¡Empate!', color: 'text-yellow-400' };
+      if (
+        (user === 'rock' && computer === 'scissors') ||
+        (user === 'paper' && computer === 'rock') ||
+        (user === 'scissors' && computer === 'paper')
+      ) {
+        confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+        return { text: '¡Ganaste!', color: 'text-green-400' };
+      }
+      return { text: '¡Perdiste!', color: 'text-red-400' };
+    }
+
+    async function initMediaPipe() {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+
+      gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task"
+        },
+        numHands: 1,
+        runningMode: "video"
+      });
+
+      console.log("✅ MediaPipe Gesture Recognizer listo (versión latest)");
+      startCamera();
+    }
+
+    function startCamera() {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => {
+          video.srcObject = stream;
+          video.addEventListener('loadeddata', () => requestAnimationFrame(predictWebcam));
+        })
+        .catch(err => {
+          mainMessage.innerHTML = "❌ No se pudo acceder a la cámara";
+          console.error(err);
+        });
+    }
+
+    function predictWebcam() {
+      if (!gestureRecognizer || video.readyState < 2) {
+        requestAnimationFrame(predictWebcam);
+        return;
+      }
+
+      const nowInMs = Date.now();
+      const results = gestureRecognizer.recognizeForVideo(video, nowInMs);
+
+      if (results.gestures?.length > 0) {
+        const gesture = results.gestures[0][0].categoryName;
+        const score = results.gestures[0][0].score;
+
+        if (score > 0.75) {
+          lastGesture = gesture;
+          lastScore = score;
+        }
+      } else {
+        lastGesture = null;
+      }
+
+      if (state === 'idle' && lastGesture === 'Thumb_Up' && lastScore > 0.8) {
+        startCountdown();
+      }
+
+      requestAnimationFrame(predictWebcam);
+    }
+
+    function startCountdown() {
+      state = 'countdown';
+      mainMessage.classList.add('hidden');
+      countdownContainer.classList.remove('hidden');
+      resultContainer.classList.add('hidden');
+
+      let count = 5;
+      countdownEl.textContent = count;
+
+      countdownInterval = setInterval(() => {
+        count--;
+        countdownEl.textContent = count || "¡YA!";
+        if (count <= 0) {
+          clearInterval(countdownInterval);
+          finishRound();
+        }
+      }, 800);
+    }
+
+    async function finishRound() {
+      state = 'result';
+      countdownContainer.classList.add('hidden');
+
+      let userMove = 'rock';
+      if (lastGesture && gesturesMap[lastGesture]) {
+        userMove = gesturesMap[lastGesture].name;
+      }
+
+      const moves = ['rock', 'paper', 'scissors'];
+      const compMove = moves[Math.floor(Math.random() * 3)];
+
+      const userEmoji = gesturesMap[Object.keys(gesturesMap).find(k => gesturesMap[k].name === userMove)].emoji;
+      const compEmoji = gesturesMap[Object.keys(gesturesMap).find(k => gesturesMap[k].name === compMove)].emoji;
+
+      choicesEl.innerHTML = `
+        <div class="text-center">
+          <div class="text-7xl mb-2">🤖</div>
+          <div class="text-8xl">${compEmoji}</div>
+          <p class="text-sm mt-2 opacity-75">IA</p>
+        </div>
+        <div class="text-center">
+          <div class="text-7xl mb-2">👤</div>
+          <div class="text-8xl">${userEmoji}</div>
+          <p class="text-sm mt-2 opacity-75">Tú</p>
+        </div>
+      `;
+
+      const result = getResult(userMove, compMove);
+      resultTextEl.textContent = result.text;
+      resultTextEl.className = `text-5xl font-bold ${result.color}`;
+
+      resultContainer.classList.remove('hidden');
+
+      setTimeout(() => {
+        state = 'idle';
+        resultContainer.classList.add('hidden');
+        mainMessage.classList.remove('hidden');
+        mainMessage.innerHTML = `Haz <span class="text-cyan-400">pulgar arriba 👍</span><br>para jugar de nuevo`;
+      }, 4500);
+    }
+
+    // Iniciar todo
+    initMediaPipe();
+  </script>
+</body>
+</html>
