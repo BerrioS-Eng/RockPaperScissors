@@ -1,19 +1,54 @@
 <!DOCTYPE html>
 <html lang="es" class="h-full">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rock Paper Scissors Inmersive Game</title>
+  <title>Rock Paper Scissors Immersive Game</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    video { object-fit: cover; }
-    .neon { text-shadow: 0 0 20px rgb(34 211 238), 0 0 40px rgb(34 211 238); }
-    .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); }
+
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    video {
+      object-fit: cover;
+    }
+
+    .neon {
+      text-shadow: 0 0 20px rgb(34 211 238), 0 0 40px rgb(34 211 238);
+    }
+
+    .glass {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+    }
+
+    @keyframes shake {
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      25% {
+        transform: translateX(-8px) rotate(-5deg);
+      }
+
+      75% {
+        transform: translateX(8px) rotate(5deg);
+      }
+    }
+
+    .shake {
+      animation: shake 0.4s ease-in-out;
+    }
   </style>
 </head>
+
 <body class="bg-black text-white h-screen overflow-hidden relative">
 
   <!-- Cámara full-screen -->
@@ -28,7 +63,8 @@
       </div>
 
       <div id="countdownContainer" class="hidden">
-        <div id="countdown" class="text-[12rem] font-bold text-cyan-400 tracking-tighter neon transition-all duration-200"></div>
+        <div id="countdown"
+          class="text-[12rem] font-bold text-cyan-400 tracking-tighter neon transition-all duration-200"></div>
       </div>
 
       <div id="resultContainer" class="hidden space-y-8">
@@ -58,9 +94,9 @@
 
     const gesturesMap = {
       'Closed_Fist': { name: 'rock', emoji: '✊' },
-      'Open_Palm':   { name: 'paper', emoji: '✋' },
-      'Victory':     { name: 'scissors', emoji: '✌️' },
-      'Thumb_Up':    { name: 'thumbsup', emoji: '👍' }
+      'Open_Palm': { name: 'paper', emoji: '✋' },
+      'Victory': { name: 'scissors', emoji: '✌️' },
+      'Thumb_Up': { name: 'thumbsup', emoji: '👍' }
     };
 
     function getResult(user, computer) {
@@ -143,6 +179,9 @@
       countdownEl.textContent = count;
 
       countdownInterval = setInterval(() => {
+        countdownEl.classList.remove('shake');
+        void countdownEl.offsetWidth;
+        countdownEl.classList.add('shake');
         count--;
         countdownEl.textContent = count || "¡YA!";
         if (count <= 0) {
@@ -198,4 +237,5 @@
     initMediaPipe();
   </script>
 </body>
+
 </html>
